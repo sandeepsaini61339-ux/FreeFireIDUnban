@@ -16,12 +16,12 @@ jobs:
       - name: Extract Android project
         run: |
           mkdir -p project
-          unzip -q FreeFireIDUnban_Android_Project.zip -d project
+          unzip -q FreeFireIDUnban_Android_Project_FIXED.zip -d project
           echo "Extracted files:"
           find project -maxdepth 4 -type f | sort
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -34,11 +34,14 @@ jobs:
       - name: Find Android project
         run: |
           APP_GRADLE=$(find project -type f -path '*/app/build.gradle' | head -n 1)
+
           if [ -z "$APP_GRADLE" ]; then
             echo "ERROR: app/build.gradle not found"
             exit 1
           fi
+
           PROJECT_DIR=$(dirname "$(dirname "$APP_GRADLE")")
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Android project found at: $PROJECT_DIR"
 
