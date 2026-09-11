@@ -13,27 +13,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract Android project
+      - name: Find ZIP project
         run: |
+          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: Android project ZIP not found"
+            exit 1
+          fi
+
+          echo "Using ZIP: $ZIP_FILE"
+
           mkdir -p project
-          unzip -q FreeFireIDUnban_Android_Project_FIXED.zip -d project
-          echo "Extracted files:"
-          find project -maxdepth 4 -type f | sort
+          unzip -q "$ZIP_FILE" -d project
+
+          echo "Project files:"
+          find project -maxdepth 5 -type f | sort
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: '8.9'
+          gradle-version: "8.9"
 
       - name: Find Android project
         run: |
-          APP_GRADLE=$(find project -type f -path '*/app/build.gradle' | head -n 1)
+          APP_GRADLE=$(find project -type f -path "*/app/build.gradle" | head -n 1)
 
           if [ -z "$APP_GRADLE" ]; then
             echo "ERROR: app/build.gradle not found"
@@ -43,7 +53,36 @@ jobs:
           PROJECT_DIR=$(dirname "$(dirname "$APP_GRADLE")")
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project found at: $PROJECT_DIR"
+
+          echo "Android project:"
+          echo "$PROJECT_DIR"
+
+      - name: Fix Java and Kotlin target
+        run: |
+          python3 - "$PROJECT_DIR/app/build.gradle" <<'PY'
+          import sys
+          from pathlib import Path
+
+          p = Path(sys.argv[1])
+          s = p.read_text()
+
+          if "compileOptions" not in s:
+              s = s.rsplit("\n}", 1)[0] + r'''
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+          }
+          '''
+
+          p.write_text(s)
+          print(p.read_text())
+          PY
 
       - name: Build APK
         run: |
@@ -54,5 +93,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FreeFireIDUnban-APK
-          path: '**/app/build/outputs/apk/debug/*.apk'
+          path: "**/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
